@@ -417,3 +417,143 @@ export async function getProductRecommendationsAPI(req, res) {
     });
   }
 }
+
+// Customer Support functions
+
+export async function processSupportTextWithGemini(
+  problemDescription,
+  messageHistory = []
+) {
+  if (!problemDescription || typeof problemDescription !== "string") {
+    throw new Error("Invalid problem description");
+  }
+
+  const sanitizedHistory = sanitizeMessageHistory(messageHistory);
+
+  try {
+    const prompt = `You are a customer support assistant. Analyze the user's problem description and provide helpful support guidance.
+    
+User's problem: ${problemDescription}
+
+Previous conversation context:
+${JSON.stringify(sanitizedHistory, null, 2)}
+
+Response Requirements:
+- Provide clear, step-by-step solutions when possible
+- Be empathetic and professional
+- If the problem requires specific technical support, say so
+- For account issues, suggest standard troubleshooting steps
+- For product issues, suggest common solutions
+- If unclear, ask for more details
+
+Respond with ONLY a JSON object containing:
+{
+  "response": "your support response",
+  "requiresHuman": boolean,
+  "nextSteps": ["array", "of", "suggested", "actions"]
+}`;
+
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response.text();
+
+    // Parse the response
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      const jsonMatch = text.match(/\{.*\}/s);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      } else {
+        parsed = {
+          response: text,
+          requiresHuman: true,
+          nextSteps: ["Please provide more details about your issue"],
+        };
+      }
+    }
+
+    if (!parsed.response) {
+      throw new Error("No response found in Gemini output");
+    }
+
+    return {
+      success: true,
+      ...parsed,
+    };
+  } catch (error) {
+    console.error("Gemini support text processing error:", error);
+    throw new Error(`Failed to process support text: ${error.message}`);
+  }
+}
+
+export async function processSupportImageWithGroq(
+  imageBase64,
+  problemContext = ""
+) {
+  if (!imageBase64 || typeof imageBase64 !== "string") {
+    throw new Error("Invalid image data");
+  }
+
+  try {
+    const messages = [
+      {
+        role: "system",
+        content: `You are a visual support assistant. Analyze the provided image along with any context and help diagnose the problem.
+        
+Context from user: ${problemContext || "No additional context provided"}
+
+Respond with ONLY a JSON object containing:
+{
+  "description": "your description of what you see in the image",
+  "issues": ["array", "of", "identified", "issues"],
+  "suggestions": ["array", "of", "suggested", "solutions"]
+}`,
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/jpeg;base64,${imageBase64}`,
+            },
+          },
+          {
+            type: "text",
+            text:
+              problemContext ||
+              "Please analyze this image for support purposes",
+          },
+        ],
+      },
+    ];
+
+    const chatCompletion = await groq.chat.completions.create({
+      messages,
+      model: "llama3-70b-8192",
+      temperature: 0.3,
+      max_tokens: 1024,
+      response_format: { type: "json_object" },
+    });
+
+    const response = chatCompletion.choices[0]?.message?.content;
+    if (!response) {
+      throw new Error("Empty response from Groq API");
+    }
+
+    const parsed = JSON.parse(response);
+    if (!parsed.description || !parsed.issues) {
+      throw new Error("Invalid response format from Groq");
+    }
+
+    return {
+      success: true,
+      ...parsed,
+    };
+  } catch (error) {
+    console.error("Groq image processing error:", error);
+    throw new Error(`Failed to process support image: ${error.message}`);
+  }
+}

@@ -1,6 +1,10 @@
 import express from "express";
 import cors from "cors";
-import { getMessageFromAgent } from "./functions.js";
+import {
+  getMessageFromAgent,
+  processSupportTextWithGemini,
+  processSupportImageWithGroq,
+} from "./functions.js";
 
 const app = express();
 const port = process.env.PORT || 5001;
@@ -242,6 +246,83 @@ app.get("/product-offers", async (req, res) => {
     res.status(500).json({
       error: "Failed to fetch product offers",
       message: "Could not retrieve product offers from the API",
+      details: error.message,
+    });
+  }
+});
+
+// Add to app.js (before the 404 handler)
+app.post("/support", async (req, res) => {
+  try {
+    // Validate request body
+    if (!req.body) {
+      return res.status(400).json({
+        error: "Missing request body",
+        message: "Please provide problem description and/or image",
+      });
+    }
+
+    const { problemDescription, imageBase64, messageHistory = [] } = req.body;
+
+    // Validate at least one input is provided
+    if (!problemDescription && !imageBase64) {
+      return res.status(400).json({
+        error: "Missing input",
+        message: "Please provide either a problem description or an image",
+      });
+    }
+
+    let textResponse = null;
+    let imageResponse = null;
+
+    // Process text if provided
+    if (problemDescription) {
+      try {
+        textResponse = await processSupportTextWithGemini(
+          problemDescription,
+          messageHistory
+        );
+      } catch (error) {
+        console.error("Text processing failed:", error);
+        textResponse = {
+          error: "Text processing failed",
+          message: "Could not analyze your problem description",
+          details: error.message,
+        };
+      }
+    }
+
+    // Process image if provided
+    if (imageBase64) {
+      try {
+        imageResponse = await processSupportImageWithGroq(
+          imageBase64,
+          problemDescription
+        );
+      } catch (error) {
+        console.error("Image processing failed:", error);
+        imageResponse = {
+          error: "Image processing failed",
+          message: "Could not analyze your image",
+          details: error.message,
+        };
+      }
+    }
+
+    // Combine responses
+    const combinedResponse = {
+      success: true,
+      timestamp: new Date().toISOString(),
+      textAnalysis: problemDescription ? textResponse : null,
+      imageAnalysis: imageBase64 ? imageResponse : null,
+    };
+
+    res.status(200).json(combinedResponse);
+  } catch (error) {
+    console.error("Support endpoint error:", error);
+    res.status(500).json({
+      error: "Server error",
+      message: "Failed to process your support request",
       details: error.message,
     });
   }
