@@ -6,6 +6,7 @@ import {
   handleShoppingIntent,
   handleGreetingIntent,
 } from "./handlerfunctions.js";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,

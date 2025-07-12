@@ -264,6 +264,12 @@ app.post("/support", async (req, res) => {
 
     const { problemDescription, imageBase64, messageHistory = [] } = req.body;
 
+    console.log("Support request received:", {
+      problemDescription,
+      hasImage: !!imageBase64,
+      messageHistoryLength: messageHistory.length,
+      messageHistory: messageHistory
+    });
     // Validate at least one input is provided
     if (!problemDescription && !imageBase64) {
       return res.status(400).json({
@@ -306,6 +312,28 @@ app.post("/support", async (req, res) => {
           message: "Could not analyze your image",
           details: error.message,
         };
+      }
+    }
+
+    if (problemDescription) {
+      try {
+        textResponse = await processSupportTextWithGemini(problemDescription, messageHistory);
+        if (typeof textResponse === "object") {
+          textResponse = textResponse.message || JSON.stringify(textResponse);
+        }
+      } catch (error) {
+        textResponse = "Text processing failed";
+      }
+    }
+
+    if (imageBase64) {
+      try {
+        imageResponse = await processSupportImageWithGroq(imageBase64, problemDescription);
+        if (typeof imageResponse === "object") {
+          imageResponse = imageResponse.message || JSON.stringify(imageResponse);
+        }
+      } catch (error) {
+        imageResponse = error.message || "Image processing failed";
       }
     }
 
