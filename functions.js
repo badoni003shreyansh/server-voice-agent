@@ -10,6 +10,8 @@ import {
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+const googleModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 // Helper function to ensure message content is always a string
 export function sanitizeMessageHistory(messageHistory) {
@@ -453,7 +455,7 @@ Respond with ONLY a JSON object containing:
   "nextSteps": ["array", "of", "suggested", "actions"]
 }`;
 
-    const result = await model.generateContent(prompt);
+    const result = await googleModel.generateContent(prompt);
     const response = result.response;
     const text = response.text();
 
