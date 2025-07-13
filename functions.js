@@ -491,6 +491,7 @@ Respond with ONLY a JSON object containing:
   }
 }
 
+//image support
 export async function processSupportImageWithGroq(
   imageBase64,
   problemContext = ""
