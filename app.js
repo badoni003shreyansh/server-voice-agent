@@ -4,6 +4,7 @@ import {
   getMessageFromAgent,
   processSupportTextWithGemini,
   processSupportImageWithGroq,
+  getShoppingRecommendations,
 } from "./functions.js";
 
 const app = express();
@@ -73,6 +74,80 @@ app.post("/chat", async (req, res) => {
 
     // Get response from Groq
     const response = await getMessageFromAgent(transcript, messageHistory);
+    console.log("Response from Groq:", response);
+
+    // Handle error responses
+    if (response.error) {
+      return res.status(400).json({
+        error: response.error,
+        message: response.message,
+        details: response.details || null,
+      });
+    }
+
+    // Success response
+    res.status(200).json({
+      success: true,
+      intent: response.intent,
+      message: response.message,
+      data: response.recommendations || null,
+      query: response.query || null,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Chat endpoint error:", error);
+    res.status(500).json({
+      error: "Server error",
+      message: "Failed to process your request",
+      details: error.message,
+    });
+  }
+});
+
+//shopping endpoint
+app.post("/shop-products", async (req, res) => {
+  try {
+    // Validate request body
+    if (!req.body) {
+      return res.status(400).json({
+        error: "Missing request body",
+        message: "Please provide transcript and messageHistory in request body",
+      });
+    }
+
+    const { transcript, messageHistory = [] } = req.body;
+
+    // Validate transcript
+    if (!transcript) {
+      return res.status(400).json({
+        error: "Missing transcript",
+        message: "Please provide a transcript parameter",
+      });
+    }
+
+    if (typeof transcript !== "string") {
+      return res.status(400).json({
+        error: "Invalid transcript format",
+        message: "Transcript must be a string",
+      });
+    }
+
+    // Validate messageHistory
+    if (!Array.isArray(messageHistory)) {
+      return res.status(400).json({
+        error: "Invalid messageHistory format",
+        message: "MessageHistory must be an array",
+      });
+    }
+
+    console.log(`Received transcript: ${transcript}`);
+    console.log(`Message history length: ${messageHistory.length}`);
+
+    // Get response from Groq
+    const response = await getShoppingRecommendations(
+      transcript,
+      messageHistory
+    );
     console.log("Response from Groq:", response);
 
     // Handle error responses
@@ -268,7 +343,7 @@ app.post("/support", async (req, res) => {
       problemDescription,
       hasImage: !!imageBase64,
       messageHistoryLength: messageHistory.length,
-      messageHistory: messageHistory
+      messageHistory: messageHistory,
     });
     // Validate at least one input is provided
     if (!problemDescription && !imageBase64) {
@@ -317,7 +392,10 @@ app.post("/support", async (req, res) => {
 
     if (problemDescription) {
       try {
-        textResponse = await processSupportTextWithGemini(problemDescription, messageHistory);
+        textResponse = await processSupportTextWithGemini(
+          problemDescription,
+          messageHistory
+        );
         if (typeof textResponse === "object") {
           textResponse = textResponse.message || JSON.stringify(textResponse);
         }
@@ -328,9 +406,13 @@ app.post("/support", async (req, res) => {
 
     if (imageBase64) {
       try {
-        imageResponse = await processSupportImageWithGroq(imageBase64, problemDescription);
+        imageResponse = await processSupportImageWithGroq(
+          imageBase64,
+          problemDescription
+        );
         if (typeof imageResponse === "object") {
-          imageResponse = imageResponse.message || JSON.stringify(imageResponse);
+          imageResponse =
+            imageResponse.message || JSON.stringify(imageResponse);
         }
       } catch (error) {
         imageResponse = error.message || "Image processing failed";

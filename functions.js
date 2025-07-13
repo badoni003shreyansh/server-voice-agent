@@ -308,12 +308,12 @@ export async function getMessageFromAgent(transcript, messageHistory = []) {
       const searchQuery = searchResult.searchQuery;
       console.log("Search query extracted:", searchQuery);
 
-      console.log("Step 3: Fetching products from Walmart API...");
+      console.log("Step 3: Fetching products from API...");
       let productResults;
       try {
         productResults = await searchProducts(searchQuery);
       } catch (error) {
-        console.error("Walmart API failed:", error);
+        console.error(" API failed:", error);
         return {
           error: "Failed to fetch products",
           message:
@@ -558,5 +558,87 @@ Respond with ONLY a JSON object containing:
   } catch (error) {
     console.error("Groq image processing error:", error);
     throw new Error(`Failed to process support image: ${error.message}`);
+  }
+}
+
+//product recommendations function
+export async function getShoppingRecommendations(
+  transcript,
+  messageHistory = []
+) {
+  try {
+    if (!transcript || typeof transcript !== "string") {
+      return {
+        error: "Invalid input",
+        message: "Please provide a valid product request.",
+      };
+    }
+
+    console.log("Step 1: Getting search query from user input...");
+    let searchResult;
+    try {
+      searchResult = await handleShoppingIntent(transcript, messageHistory);
+    } catch (error) {
+      console.error("Search query extraction failed:", error);
+      return {
+        error: "Failed to understand product request",
+        message: "Could you please clarify what product you're looking for?",
+        details: error.message,
+      };
+    }
+
+    const searchQuery = searchResult.searchQuery;
+    console.log("Search query extracted:", searchQuery);
+
+    console.log("Step 2: Fetching products from API...");
+    let productResults;
+    try {
+      productResults = await searchProducts(searchQuery);
+    } catch (error) {
+      console.error(" API failed:", error);
+      return {
+        error: "Failed to fetch products",
+        message:
+          "Sorry, I couldn't search for products right now. Please try again later.",
+        details: error.message,
+      };
+    }
+
+    console.log("Step 3: Ranking products...");
+    let topProducts;
+    try {
+      topProducts = await rankProducts(productResults, transcript);
+    } catch (error) {
+      console.error("Product ranking failed:", error);
+      return {
+        error: "Failed to rank products",
+        message:
+          "I found some products but couldn't rank them properly. Please try again.",
+        details: error.message,
+      };
+    }
+
+    if (!topProducts || topProducts.length === 0) {
+      return {
+        error: "No suitable products found",
+        message:
+          "I couldn't find any suitable products for your request. Try being more specific.",
+      };
+    }
+
+    return {
+      intent: "shopping",
+      success: true,
+      query: searchQuery,
+      recommendations: topProducts,
+      message: `Here are my top ${topProducts.length} recommendations for "${searchQuery}":`,
+    };
+  } catch (error) {
+    console.error("Error in getmessagefromGroq:", error);
+    return {
+      error: "System error",
+      message: "Sorry, something went wrong. Please try again.",
+      details: error.message,
+    };
   }
 }
