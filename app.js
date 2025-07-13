@@ -420,7 +420,7 @@ app.post("/support", async (req, res) => {
           messageHistory
         );
         if (typeof textResponse === "object") {
-          textResponse = textResponse.message || JSON.stringify(textResponse);
+          textResponse = textResponse.response || JSON.stringify(textResponse);
         }
       } catch (error) {
         textResponse = "Text processing failed";
@@ -435,7 +435,7 @@ app.post("/support", async (req, res) => {
         );
         if (typeof imageResponse === "object") {
           imageResponse =
-            imageResponse.message || JSON.stringify(imageResponse);
+            imageResponse.description || JSON.stringify(imageResponse);
         }
       } catch (error) {
         imageResponse = error.message || "Image processing failed";
