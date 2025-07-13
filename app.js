@@ -179,22 +179,26 @@ app.post("/shop-products", async (req, res) => {
 });
 
 // Product search endpoint using new API
-app.get("/search-products", async (req, res) => {
+// Product search endpoint using new API
+app.post("/search-products", async (req, res) => {
   try {
-    const query = req.query.q;
+    // Get query from request body for POST request
+    const { query } = req.body;
 
     // Validate query parameter
     if (!query) {
       return res.status(400).json({
+        success: false,
         error: "Missing query parameter",
-        message: "Please provide a 'q' query parameter",
+        message: "Please provide a search query",
       });
     }
 
     if (typeof query !== "string") {
       return res.status(400).json({
+        success: false,
         error: "Invalid query parameter",
-        message: "Query parameter must be a string",
+        message: "Query must be a string",
       });
     }
 
@@ -202,52 +206,71 @@ app.get("/search-products", async (req, res) => {
     if (!process.env.RAPIDAPI_KEY) {
       console.error("Missing required environment variables");
       return res.status(500).json({
+        success: false,
         error: "Configuration error",
         message: "Server configuration is incomplete",
       });
     }
 
-    const searchUrl = `https://real-time-product-search.p.rapidapi.com/search?q=${encodeURIComponent(
+    const searchUrl = `https://real-time-amazon-data.p.rapidapi.com/search?query=${encodeURIComponent(
       query
-    )}&country=us&language=en&page=1&limit=10&sort_by=BEST_MATCH&product_condition=ANY`;
+    )}&page=1&country=US&sort_by=RELEVANCE&product_condition=ALL`;
 
-    console.log(`Fetching products for: ${query}`);
+    console.log(`Fetching Amazon products for: ${query}`);
 
     const response = await fetch(searchUrl, {
       method: "GET",
       headers: {
         "x-rapidapi-key": process.env.RAPIDAPI_KEY,
-        "x-rapidapi-host": "real-time-product-search.p.rapidapi.com",
+        "x-rapidapi-host": "real-time-amazon-data.p.rapidapi.com",
       },
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error(
-        `Product Search API error: ${response.status} - ${errorText}`
+        `Amazon Product Search API error: ${response.status} - ${errorText}`
       );
-      throw new Error(`Product Search API error: ${response.status}`);
+      throw new Error(`Amazon Product Search API error: ${response.status}`);
     }
 
     const data = await response.json();
 
     // Validate response data
     if (!data || typeof data !== "object") {
-      throw new Error("Invalid response format from Product Search API");
+      throw new Error("Invalid response format from Amazon Product Search API");
     }
 
+    // Transform products to match frontend expectations
+    const transformedProducts =
+      data?.data?.products?.slice(0, 10).map((product, idx) => ({
+        asin: product.asin,
+        image: product.product_photo || "",
+        product_title: product.product_title,
+        product_price: product.product_price,
+        rating: product.product_star_rating || "",
+        link:
+          product.product_url || `https://www.amazon.com/dp/${product.asin}`,
+        rank: idx + 1,
+      })) || [];
+
     console.log(
-      `Successfully fetched ${data?.data?.products?.length || 0} products`
+      `Successfully fetched ${transformedProducts.length} products from Amazon (limited to 10)`
     );
+
+    // Return transformed products
     res.json({
       success: true,
-      data: data,
+      data: {
+        products: transformedProducts,
+      },
     });
   } catch (error) {
-    console.error("Product search endpoint error:", error);
+    console.error("Amazon product search endpoint error:", error);
     res.status(500).json({
-      error: "Failed to fetch products",
-      message: "Could not retrieve products from the search API",
+      success: false,
+      error: "Failed to fetch Amazon products",
+      message: "Could not retrieve products from the Amazon search API",
       details: error.message,
     });
   }
