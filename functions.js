@@ -516,20 +516,9 @@ Respond with ONLY a JSON object containing:
       },
       {
         role: "user",
-        content: [
-          {
-            type: "image_url",
-            image_url: {
-              url: `data:image/jpeg;base64,${imageBase64}`,
-            },
-          },
-          {
-            type: "text",
-            text:
-              problemContext ||
-              "Please analyze this image for support purposes",
-          },
-        ],
+        content: `Image URL: data:image/jpeg;base64,${imageBase64}\n\n${
+          problemContext || "Please analyze this image for support purposes"
+        }`,
       },
     ];
 
