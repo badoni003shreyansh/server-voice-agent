@@ -535,7 +535,7 @@ Respond with ONLY a JSON object containing:
 
     const chatCompletion = await groq.chat.completions.create({
       messages,
-      model: "llama3-70b-8192",
+      model: "meta-llama/llama-4-scout-17b-16e-instruct",
       temperature: 0.3,
       max_tokens: 1024,
       response_format: { type: "json_object" },
