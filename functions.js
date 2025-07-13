@@ -491,7 +491,7 @@ Respond with ONLY a JSON object containing:
   }
 }
 
-//image support
+//image customer support
 export async function processSupportImageWithGroq(
   imageBase64,
   problemContext = ""
@@ -501,25 +501,41 @@ export async function processSupportImageWithGroq(
   }
 
   try {
-    const messages = [
-      {
-        role: "system",
-        content: `You are a visual support assistant. Analyze the provided image along with any context and help diagnose the problem.
-        
+    const query = `Analyze the provided image along with any context and help diagnose the problem.
+    
 Context from user: ${problemContext || "No additional context provided"}
 
-Respond with ONLY a JSON object containing:
+CRITICAL !!!: Return the result in JSON format with this exact structure:
 {
   "description": "your description of what you see in the image",
   "issues": ["array", "of", "identified", "issues"],
   "suggestions": ["array", "of", "suggested", "solutions"]
-}`,
-      },
+}
+
+If unable to understand the image, return:
+{
+  "description": "Image not processed",
+  "issues": [],
+  "suggestions": []
+}
+
+Respond ONLY with the JSON object. Use double quotes for all keys and values.`;
+
+    const messages = [
       {
         role: "user",
-        content: `Image URL: data:image/jpeg;base64,${imageBase64}\n\n${
-          problemContext || "Please analyze this image for support purposes"
-        }`,
+        content: [
+          {
+            type: "text",
+            text: query,
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/jpeg;base64,${imageBase64}`,
+            },
+          },
+        ],
       },
     ];
 
@@ -536,9 +552,29 @@ Respond with ONLY a JSON object containing:
       throw new Error("Empty response from Groq API");
     }
 
-    const parsed = JSON.parse(response);
-    if (!parsed.description || !parsed.issues) {
-      throw new Error("Invalid response format from Groq");
+    let parsed;
+    try {
+      parsed = JSON.parse(response);
+    } catch (e) {
+      // Fallback response if JSON parsing fails
+      parsed = {
+        description: "Image not processed",
+        issues: [],
+        suggestions: [],
+      };
+    }
+
+    // Ensure required fields exist
+    if (
+      !parsed.description ||
+      !Array.isArray(parsed.issues) ||
+      !Array.isArray(parsed.suggestions)
+    ) {
+      parsed = {
+        description: "Invalid response format",
+        issues: [],
+        suggestions: [],
+      };
     }
 
     return {
@@ -547,7 +583,14 @@ Respond with ONLY a JSON object containing:
     };
   } catch (error) {
     console.error("Groq image processing error:", error);
-    throw new Error(`Failed to process support image: ${error.message}`);
+    // Return a standardized error response
+    return {
+      success: false,
+      description: "Failed to process image",
+      issues: [],
+      suggestions: [],
+      error: error.message,
+    };
   }
 }
 
