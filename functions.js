@@ -561,6 +561,56 @@ Respond with ONLY a JSON object containing:
   }
 }
 
+//rank product recommendations function
+async function rankProductRecommendations(products, userQuery) {
+  if (!products || !Array.isArray(products)) {
+    throw new Error("Invalid products data structure");
+  }
+
+  if (products.length === 0) {
+    throw new Error("No products available");
+  }
+
+  // Take first 3 products and format them consistently
+  const topProducts = products.slice(0, 5).map((product, index) => {
+    // Extract title/name
+    const title = product.product_title || "N/A";
+
+    // Extract price
+    const price = product.product_price || "N/A";
+
+    // Extract image
+    const image = product.product_photo || "N/A";
+
+    // Extract product link
+    const link =
+      product.product_url ||
+      `https://www.amazon.com/s?k=${encodeURIComponent(title)}`;
+
+    // Extract shipping info
+    const shipping = product.delivery || "N/A";
+
+    // Extract rating if available
+    const rating = product.product_star_rating
+      ? `${product.product_star_rating}/5 (${
+          product.product_num_ratings || 0
+        } reviews)`
+      : "Not rated";
+
+    return {
+      rank: index + 1,
+      title,
+      price,
+      link,
+      image,
+      shipping,
+      rating,
+      reason: "Top matching results",
+    };
+  });
+
+  return topProducts;
+}
 //product recommendations function
 export async function getShoppingRecommendations(
   transcript,
@@ -607,7 +657,10 @@ export async function getShoppingRecommendations(
     console.log("Step 3: Ranking products...");
     let topProducts;
     try {
-      topProducts = await rankProducts(productResults, transcript);
+      topProducts = await rankProductRecommendations(
+        productResults,
+        transcript
+      );
     } catch (error) {
       console.error("Product ranking failed:", error);
       return {
