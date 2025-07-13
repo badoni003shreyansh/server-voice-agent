@@ -246,8 +246,8 @@ app.post("/search-products", async (req, res) => {
       data?.data?.products?.slice(0, 10).map((product, idx) => ({
         asin: product.asin,
         image: product.product_photo || "",
-        product_title: product.product_title,
-        product_price: product.product_price,
+        title: product.product_title,
+        price: product.product_price,
         rating: product.product_star_rating || "",
         link:
           product.product_url || `https://www.amazon.com/dp/${product.asin}`,
